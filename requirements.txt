@@ -1,0 +1,13 @@
+dill
+ipykernel
+ipython
+ipython-genutils
+jupyter-client
+jupyter-core
+numpy
+pandas
+pathos
+scikit-learn
+shap
+treefarms
+utils
