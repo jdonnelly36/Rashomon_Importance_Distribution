@@ -32,7 +32,7 @@ def construct_tree_rset(
                                         f'trie_bootstrap_{config_idx}_eps_{eps}_db_{db}_reg_{lam}.json')
         configJson['rashomon_model_set_suffix'] = f'_bootstrap_{config_idx}_eps_{eps}_db_{db}_reg_{lam}.json'
 
-        configJson['verbose'] = verbose
+        configJson['verbose'] = 'true' if verbose else 'false'
         
         if verbose:
             print('Running TreeFarms')
