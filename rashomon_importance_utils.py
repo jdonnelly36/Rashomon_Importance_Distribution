@@ -84,7 +84,7 @@ def trie_predict_recursive(dataset, trie, node_assignments):
                 new_node_assignments[cur_split_mask] = split
                 offset_for_leaves += 1
             else:
-                l_split_mask = dataset[:, split] == 0
+                l_split_mask = dataset[:, split] != 0
 
                 new_node_assignments[cur_split_mask & l_split_mask] = (split_ind - offset_for_leaves) * 2
                 new_node_assignments[cur_split_mask & (~l_split_mask)] = (split_ind - offset_for_leaves) * 2 + 1

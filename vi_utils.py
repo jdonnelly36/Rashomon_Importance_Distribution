@@ -84,7 +84,7 @@ def get_model_reliances(
 
     original_preds = np.array(trie_predict_recursive(x_all, trie, np.zeros(x_all.shape[0])))
     # map from -2, -1 version to 0, 1 labels
-    original_preds = original_preds + 2
+    original_preds = -1 * (original_preds + 1)
     original_acc = (np.repeat(y_all.reshape((1, -1)), original_preds.shape[0], axis=0) == original_preds).mean(axis=1)
     
     perturbed_acc = 0
@@ -92,7 +92,7 @@ def get_model_reliances(
         x_perturbed, y_perturbed = perturb_divided(data_df.to_numpy(), var_of_interest)
         pert_preds = np.array(trie_predict_recursive(x_perturbed, trie, np.zeros(x_perturbed.shape[0])))
         # map from -2, -1 version to 0, 1 labels
-        pert_preds = pert_preds + 2
+        pert_preds = -1 * (pert_preds + 1)
         perturbed_acc += (np.repeat(y_perturbed.reshape((1, -1)), pert_preds.shape[0], axis=0) == pert_preds).mean(axis=1)
 
     perturbed_acc /= num_perts
