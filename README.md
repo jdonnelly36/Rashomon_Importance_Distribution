@@ -28,6 +28,6 @@ _**rashomon_output_dir**_ -- The name of the subfolder of cache_dir_root in whic
 
 _**verbose**_ -- Whether to produce extra logging
 
-_**vi_metric**_ -- The VI metric to use for this RID; should be one of ['sub_mr', 'div_mr', 'sub_cmr', 'div_cmr']
+_**vi_metric**_ -- The VI metric to use for this RID; should be one of ['sub_mr', 'div_mr']
     
 _**max_par_for_gosdt**_ -- The maximum number of instances of GOSDT to run in parallell; reduce this number if memory issues occur
