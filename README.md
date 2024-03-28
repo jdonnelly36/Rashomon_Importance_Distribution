@@ -20,14 +20,14 @@ _**eps**_ -- The threshold to use when computing rashomon sets (i.e., models wit
 
 _**dataset_name**_ -- The name of the datset being analyzed. Used to determine where to cache various files
 
-_**n_resamples**_ -- The number of bootstrap samples to compute
+_**n_resamples**_ -- The number of bootstrap samples to compute. Default: 100
 
-_**cache_dir_root**_ -- The root file path at which all cached files should be stored
+_**cache_dir_root**_ -- The root file path at which all cached files should be stored. Default: './cached_files'
 
-_**rashomon_output_dir**_ -- The name of the subfolder of cache_dir_root in which rashomon sets will be stored
+_**rashomon_output_dir**_ -- The name of the subfolder of cache_dir_root in which rashomon sets will be stored. Default: 'rashomon_outputs'
 
-_**verbose**_ -- Whether to produce extra logging
+_**verbose**_ -- Whether to produce extra logging. Default: False
 
-_**vi_metric**_ -- The VI metric to use for this RID; should be one of ['sub_mr', 'div_mr']
+_**vi_metric**_ -- The VI metric to use for this RID; should be one of ['sub_mr', 'div_mr']. Default: 'sub_mr'
     
-_**max_par_for_gosdt**_ -- The maximum number of instances of GOSDT to run in parallell; reduce this number if memory issues occur
+_**max_par_for_gosdt**_ -- The maximum number of instances of GOSDT to run in parallell; reduce this number if memory issues occur. Default: 5
