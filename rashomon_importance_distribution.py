@@ -3,11 +3,13 @@ import numpy as np
 import pickle
 import json
 import time
+import warnings
 import pandas as pd
 from rashomon_importance_utils import construct_tree_rset
 from vi_utils import get_model_reliances
 from sklearn.utils import resample
 
+from gosdt.model.threshold_guess import compute_thresholds
 from pathos.multiprocessing import ProcessingPool as Pool
 from tqdm import tqdm
 
@@ -54,25 +56,47 @@ class RashomonImportanceDistribution:
         The maximum number of instances of GOSDT to run
         in parallell; reduce this number if memory issues
         occur
+    allow_binarize_internally : bool
+        Whether to allow RID to binarize data internally
+        using threshold guessing
     '''
     def __init__(self, 
-            input_df, binning_map,
+            input_df,
             db, lam, eps, 
+            binning_map=None,
             dataset_name='dataset_1', 
             n_resamples=100,
             cache_dir_root='./cached_files',
             rashomon_output_dir='rashomon_outputs',
             verbose=False,
             vi_metric='sub_mr',
-            max_par_for_gosdt=5):
+            max_par_for_gosdt=5,
+            allow_binarize_internally=False):
 
         supported_vis = ['sub_mr', 'div_mr', 'sub_cmr', 'div_cmr', 'shap']
         assert vi_metric in supported_vis, \
             f"Error: VI metric {vi_metric} not recognized. Supported VI metrics are {supported_vis}"
 
+        if input_df.isin([0, 1]).all().all():
+            assert binning_map, "Error: Binning map must not be None if binary data is given."
+            self.input_df = input_df
+            self.binning_map = binning_map
+        elif allow_binarize_internally:
+            warnings.warn("Non-binarized data detected, binarizing internally using guesses.")
+            binarized_df, binning_map = self._binarize_data_guesses(input_df)
+            self.input_df = binarized_df
+            self.binning_map = binning_map
+        else:
+            raise Exception(
+                """
+                Non-binarized data was given, but allow_binarize_internally is set to False. 
+                If you would like RID to binarize data internally, you can specify allow_binarize_internally=True.
+                Otherwise, binarize your data before passing it to RID.
+                """
+            )
+        self.input_df = self.input_df.astype(int)
+
         self.vi_metric = vi_metric
-        self.input_df = input_df
-        self.binning_map = binning_map
         self.n_vars = len(binning_map)
         self.n_resamples = n_resamples
         self.db = db
@@ -160,6 +184,40 @@ class RashomonImportanceDistribution:
                 config_idx=bootstrap_ind,
                 verbose=self.verbose
             )
+
+    def _binarize_data_guesses(self, df_unbinned):
+        '''
+        Converts a non-binarized dataset to a binarized version
+        that is compliant with RID
+
+        Parameters
+        ----------
+            df_unbinned : pd.DataFrame
+                The original, non-binarized dataset provided
+        '''
+        n_est = 40
+        max_depth = 1
+        X_all = df_unbinned.iloc[:, :-1]
+        y = df_unbinned.iloc[:, -1]
+        X_binned_full, thresholds, header, threshold_guess_time = compute_thresholds(X_all.copy(), y.copy(), n_est, max_depth)
+        df = pd.concat((X_binned_full, y), axis=1)
+
+        col_map = {}
+        for i, c in enumerate(df_unbinned.columns):
+            col_map[c] = i
+
+        bins = {}
+        for b in range(len(df_unbinned.columns)-1):
+            bins[b] = []
+
+        counter = 0
+        for h in header:
+            cur_var = col_map[h.split('<=')[0]]
+            bins[cur_var] = bins[cur_var] + [counter]
+            counter += 1
+        bin_map = bins
+
+        return df, bin_map
 
     def _compute_and_aggregate_vis(self):
         '''

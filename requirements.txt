@@ -1,4 +1,5 @@
 dill
+gosdt
 ipykernel
 ipython
 ipython-genutils
