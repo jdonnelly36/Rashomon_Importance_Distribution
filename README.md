@@ -31,3 +31,5 @@ _**verbose**_ -- Whether to produce extra logging. Default: False
 _**vi_metric**_ -- The VI metric to use for this RID; should be one of ['sub_mr', 'div_mr']. Default: 'sub_mr'
     
 _**max_par_for_gosdt**_ -- The maximum number of instances of GOSDT to run in parallell; reduce this number if memory issues occur. Default: 5
+
+_**allow_binarize_internally**_ -- Whether to allow RID to binarize any non-binary data internally using threshold guessing. Note that, if set to True, there may be variables in the original dataset that recieve no bins and as such will not be fully evaluated for importance. If this behavior is not desirable, please provide already binarized data. Default: False
