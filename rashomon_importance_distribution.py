@@ -9,7 +9,7 @@ from rashomon_importance_utils import construct_tree_rset
 from vi_utils import get_model_reliances
 from sklearn.utils import resample
 
-from gosdt.model.threshold_guess import compute_thresholds
+from gosdt import ThresholdGuessBinarizer
 from pathos.multiprocessing import ProcessingPool as Pool
 from tqdm import tqdm
 
@@ -189,7 +189,6 @@ class RashomonImportanceDistribution:
         '''
         Converts a non-binarized dataset to a binarized version
         that is compliant with RID
-
         Parameters
         ----------
             df_unbinned : pd.DataFrame
@@ -199,23 +198,12 @@ class RashomonImportanceDistribution:
         max_depth = 1
         X_all = df_unbinned.iloc[:, :-1]
         y = df_unbinned.iloc[:, -1]
-        X_binned_full, thresholds, header, threshold_guess_time = compute_thresholds(X_all.copy(), y.copy(), n_est, max_depth)
+        enc = ThresholdGuessBinarizer(n_estimators=n_est, max_depth=max_depth, random_state=42)
+        enc.set_output(transform="pandas")
+        X_binned_full = enc.fit_transform(X_binned_full, y)
+        bin_map = enc.feature_map()
+
         df = pd.concat((X_binned_full, y), axis=1)
-
-        col_map = {}
-        for i, c in enumerate(df_unbinned.columns):
-            col_map[c] = i
-
-        bins = {}
-        for b in range(len(df_unbinned.columns)-1):
-            bins[b] = []
-
-        counter = 0
-        for h in header:
-            cur_var = col_map[h.split('<=')[0]]
-            bins[cur_var] = bins[cur_var] + [counter]
-            counter += 1
-        bin_map = bins
 
         return df, bin_map
 
