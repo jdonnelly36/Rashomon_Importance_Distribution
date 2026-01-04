@@ -6,7 +6,7 @@ import time
 import warnings
 import pandas as pd
 from rashomon_importance_utils import construct_tree_rset
-from vi_utils import get_model_reliances
+from vi_utils import get_model_reliances, PredictionCache
 from sklearn.utils import resample
 
 from gosdt import ThresholdGuessBinarizer
@@ -59,6 +59,8 @@ class RashomonImportanceDistribution:
     allow_binarize_internally : bool
         Whether to allow RID to binarize data internally
         using threshold guessing
+    use_cached_preds : bool
+        If True, use caching to avoid repeat prediction on a row
     '''
     def __init__(self, 
             input_df,
@@ -71,7 +73,9 @@ class RashomonImportanceDistribution:
             verbose=False,
             vi_metric='sub_mr',
             max_par_for_gosdt=5,
-            allow_binarize_internally=False):
+            allow_binarize_internally=False,
+            use_cached_preds=False
+        ):
 
         supported_vis = ['sub_mr', 'div_mr', 'sub_cmr', 'div_cmr', 'shap']
         assert vi_metric in supported_vis, \
@@ -106,6 +110,8 @@ class RashomonImportanceDistribution:
         self.rashomon_output_dir = rashomon_output_dir
         self.verbose = verbose
         self.max_par_for_gosdt = max_par_for_gosdt
+        self.use_cached_preds = use_cached_preds
+        self.cached_row_predictions_by_ind = [None for _ in range(n_resamples)]
 
         try:
             self.num_cpus = os.cpu_count()
@@ -126,7 +132,7 @@ class RashomonImportanceDistribution:
 
         # Second, compute each necessary Rashomon set ---------------------
         with Pool(min(self.num_cpus, self.max_par_for_gosdt)) as p:
-            p.map(RashomonImportanceDistribution._construct_rashomon_sets, 
+            self.cached_row_predictions_by_ind = p.map(RashomonImportanceDistribution._construct_rashomon_sets, 
                 [self]*self.n_resamples,
                 [i for i in range(self.n_resamples)])
 
@@ -174,7 +180,7 @@ class RashomonImportanceDistribution:
         else:
             if self.verbose:
                 print("Generating Rashomon set")
-            construct_tree_rset(
+            tf = construct_tree_rset(
                 dataset_path=os.path.join(self.cache_dir, f'tmp_bootstrap_{bootstrap_ind}.csv'),
                 lam=self.lam,
                 db=self.db,
@@ -184,6 +190,10 @@ class RashomonImportanceDistribution:
                 config_idx=bootstrap_ind,
                 verbose=self.verbose
             )
+            if self.use_cached_preds:
+                return PredictionCache(tf.get_tree_count())
+            else:
+                return None
 
     def _binarize_data_guesses(self, df_unbinned):
         '''
@@ -200,7 +210,7 @@ class RashomonImportanceDistribution:
         y = df_unbinned.iloc[:, -1]
         enc = ThresholdGuessBinarizer(n_estimators=n_est, max_depth=max_depth, random_state=42)
         enc.set_output(transform="pandas")
-        X_binned_full = enc.fit_transform(X_binned_full, y)
+        X_binned_full = enc.fit_transform(X_all, y)
         bin_map = enc.feature_map()
 
         df = pd.concat((X_binned_full, y), axis=1)
@@ -312,12 +322,12 @@ class RashomonImportanceDistribution:
                 cur_iterator = tqdm(self.binning_map)
             else:
                 cur_iterator = self.binning_map
-            for var in cur_iterator:
+            for var_idx, var in enumerate(cur_iterator):
                 tmp_div_model_reliances, tmp_sub_model_reliances, num_models = get_model_reliances(running_trie, resampled_df, 
-                    var_of_interest=self.binning_map[var])
+                    var_of_interest=self.binning_map[var], cached_row_predictions=self.cached_row_predictions_by_ind[bootstrap_ind])
 
-                div_model_reliances[var] = tmp_div_model_reliances
-                sub_model_reliances[var] = tmp_sub_model_reliances
+                div_model_reliances[var_idx] = tmp_div_model_reliances
+                sub_model_reliances[var_idx] = tmp_sub_model_reliances
             
         return (div_model_reliances, sub_model_reliances)
 
