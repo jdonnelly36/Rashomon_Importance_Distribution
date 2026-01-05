@@ -72,9 +72,9 @@ class RashomonImportanceDistribution:
             rashomon_output_dir='rashomon_outputs',
             verbose=False,
             vi_metric='sub_mr',
-            max_par_for_gosdt=5,
+            max_par_for_gosdt=1,
             allow_binarize_internally=False,
-            use_cached_preds=False
+            use_cached_preds=True
         ):
 
         supported_vis = ['sub_mr', 'div_mr', 'sub_cmr', 'div_cmr', 'shap']
@@ -99,6 +99,7 @@ class RashomonImportanceDistribution:
                 """
             )
         self.input_df = self.input_df.astype(int)
+        self.binning_map = {k: self.binning_map[k] for k in sorted(self.binning_map)}
 
         self.vi_metric = vi_metric
         self.n_vars = len(binning_map)
@@ -204,14 +205,19 @@ class RashomonImportanceDistribution:
             df_unbinned : pd.DataFrame
                 The original, non-binarized dataset provided
         '''
-        n_est = 40
-        max_depth = 1
+        n_est = 15
+        max_depth = 2
         X_all = df_unbinned.iloc[:, :-1]
         y = df_unbinned.iloc[:, -1]
         enc = ThresholdGuessBinarizer(n_estimators=n_est, max_depth=max_depth, random_state=42)
         enc.set_output(transform="pandas")
         X_binned_full = enc.fit_transform(X_all, y)
         bin_map = enc.feature_map()
+
+        # Add members to the binmap for dropped ftrs
+        for v in range(len(X_all.columns)):
+            if v not in bin_map:
+                bin_map[v] = []
 
         df = pd.concat((X_binned_full, y), axis=1)
 
