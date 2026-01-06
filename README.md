@@ -8,9 +8,9 @@ In order to configure your environment, you will need to:
 ### Computing RID
 A simple demonstration of the RID interface can be seen in `example.ipynb`. The primary interface for RID is the `RashomonImportanceDistribution` class, which computes RID in its constructor and provides functions to examine RID. The following parameters are available in the `RashomonImportanceDistribution`constructor:
 
-_**input_df**_ -- A pandas DataFrame containing a **binarized** version of the dataset we seek to explain
+_**input_df**_ -- A pandas DataFrame containing the dataset we seek to explain
     
-_**binning_map**_ -- A dictionary of the form `{0: [0, 1, 2], 1: [3, 4], 2: [5, 6, 7, 8]}` describing which variables in the original, unbinned version of the dataset map to which columns of the binarized version `input_df`. The example given states that the 0-th variable in the original data is represented by bins 0, 1, and 2, and so on.
+_**binning_map**_ -- If input_df is already binarized, binning_map should be a dictionary of the form `{0: [0, 1, 2], 1: [3, 4], 2: [5, 6, 7, 8]}` describing which variables in the original, unbinned version of the dataset map to which columns of the binarized version `input_df`. The example given states that the 0-th variable in the original data is represented by bins 0, 1, and 2, and so on.
 
 _**db**_ -- The maximum depth allowed for the decision trees in our rashomon sets. Note that large values can cause computational problems
 
