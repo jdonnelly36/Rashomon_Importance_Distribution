@@ -4,6 +4,8 @@ import copy
 from collections import deque
 from sklearn.linear_model import LinearRegression as LinearRegression
 import sys
+import hashlib
+from typing import Dict, List
 sys.path.append('./')
 from rashomon_importance_utils import trie_predict_recursive
 
@@ -41,8 +43,9 @@ def perturb_divided(data, target_col):
 
 def get_model_reliances(
     trie, data_df, var_of_interest=0, 
-    eps=1e-6, num_perts=10,
-    for_joint=False
+    eps=1e-6, num_perts=1,
+    for_joint=False,
+    cached_row_predictions=None
 ):
     """Computes the sub and div model reliance for each tree in the given trie
     over the given dataset
@@ -58,6 +61,9 @@ def get_model_reliances(
         feature_description (dict): A dictionary that maps feature name to their
             descriptions. If it is not given, original feature names will be
             used (might be hard for readers to understand).
+        cached_row_predictions (PredictionCache, optional): A cache that maps from the
+            hash of a X value to the vector returned by trie_predict.
+            If None, don't do anything with this
 
     Returns:
         div_model_reliances: Dictionary of div model reliance values, of the form
@@ -82,7 +88,14 @@ def get_model_reliances(
     x_all = data_df.to_numpy()[:, 0 : data_df.shape[1] - 1]
     y_all = data_df.to_numpy()[:, data_df.shape[1] - 1]
 
-    original_preds = np.array(trie_predict_recursive(x_all, trie, np.zeros(x_all.shape[0])))
+    if cached_row_predictions is not None:
+        original_preds = predict_with_cache(
+            x_all,
+            cached_row_predictions,
+            lambda x_cur: np.stack(trie_predict_recursive(x_cur, trie, np.zeros(x_cur.shape[0])), axis=-1)
+        ).transpose()
+    else:
+        original_preds = np.array(trie_predict_recursive(x_all, trie, np.zeros(x_all.shape[0])))
     # map from -2, -1 version to 0, 1 labels
     original_preds = -1 * (original_preds + 1)
     original_acc = (np.repeat(y_all.reshape((1, -1)), original_preds.shape[0], axis=0) == original_preds).mean(axis=1)
@@ -90,7 +103,15 @@ def get_model_reliances(
     perturbed_acc = 0
     for _ in range(num_perts):
         x_perturbed, y_perturbed = perturb_divided(data_df.to_numpy(), var_of_interest)
-        pert_preds = np.array(trie_predict_recursive(x_perturbed, trie, np.zeros(x_perturbed.shape[0])))
+
+        if cached_row_predictions is not None:
+            pert_preds = predict_with_cache(
+                x_perturbed,
+                cached_row_predictions,
+                lambda x_cur: np.stack(trie_predict_recursive(x_cur, trie, np.zeros(x_cur.shape[0])), axis=-1)
+            ).transpose()
+        else:
+            pert_preds = np.array(trie_predict_recursive(x_perturbed, trie, np.zeros(x_perturbed.shape[0])))
         # map from -2, -1 version to 0, 1 labels
         pert_preds = -1 * (pert_preds + 1)
         perturbed_acc += (np.repeat(y_perturbed.reshape((1, -1)), pert_preds.shape[0], axis=0) == pert_preds).mean(axis=1)
@@ -140,3 +161,74 @@ def get_model_reliances(
     
     #print("Ran first processing loop in {} seconds".format(time.time() - start))
     return div_model_reliances, sub_model_reliances, num_models#, objective_lists
+
+def hash_rows(X: np.ndarray) -> np.ndarray:
+    """
+    Compute a stable hash for each row of X.
+    Returns an array of strings of length n_samples.
+    """
+    if not X.flags['C_CONTIGUOUS']:
+        X = np.ascontiguousarray(X)
+
+    hashes = []
+    for row in X:
+        h = hashlib.sha1(row.tobytes()).hexdigest()
+        hashes.append(h)
+    return np.array(hashes)
+
+class PredictionCache:
+    def __init__(self, n_trees):
+        self.n_trees = n_trees
+        self.cache: Dict[str, np.ndarray] = {}
+
+    def has_prediction(self, row_hash: str) -> bool:
+        return row_hash in self.cache
+
+    def get_predictions(self, row_hash: str):
+        return self.cache[row_hash]
+
+    def set_prediction(self, row_hash: str, values):
+        if row_hash not in self.cache:
+            self.cache[row_hash] = values
+
+def predict_with_cache(
+    X: np.ndarray,
+    cache: PredictionCache,
+    prediction_fn,
+) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_samples, n_features)
+    cache : PredictionCache
+    prediction_fn : function -- a function mapping from
+        a numpy array to an array of predictions
+
+    Returns
+    -------
+    preds : np.ndarray, shape (n_samples, n_models)
+    """
+    n_samples = X.shape[0]
+    row_hashes = hash_rows(X)
+    n_models = cache.n_trees
+
+    # Output matrix
+    preds = np.empty((n_samples, n_models), dtype=float)
+
+    missing_idx = [
+        i for i, h in enumerate(row_hashes)
+        if not cache.has_prediction(h)
+    ]
+
+    # Predict only missing rows
+    if missing_idx:
+        X_missing = X[missing_idx]
+        y_missing = prediction_fn(X_missing)
+        for i, y in zip(missing_idx, y_missing):
+            cache.set_prediction(row_hashes[i], y)
+
+    # Fill output matrix
+    for i, h in enumerate(row_hashes):
+        preds[i] = cache.get_predictions(h)
+
+    return preds

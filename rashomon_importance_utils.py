@@ -40,6 +40,7 @@ def construct_tree_rset(
         tf = TREEFARMS(configJson)
         tf.fit(df.iloc[:, :-1], df.iloc[:, -1])
     f.close()
+    return tf
 
 def trie_predict_recursive(dataset, trie, node_assignments):
     """Get the prediction vector for each tree in trie
