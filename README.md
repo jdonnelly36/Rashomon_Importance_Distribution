@@ -1,6 +1,8 @@
 ## RID Documentation
 This codebase contains the code necessary to compute the Rashomon Importance Distribution as described in "The Rashomon Importance Distribution: Getting RID of Unstable, Single Model-Based Variable Importance". 
 
+## Note: We recommend people interested in using RID for their problems instead use the implementation from [https://github.com/zakk-h/ArborEnum/tree/main](https://github.com/zakk-h/ArborEnum/tree/main). This version implements several speedups that make RID easier to compute in practice.
+
 ### Environment Setup
 In order to configure your environment, you will simply need to:
 1. Clone this repository
